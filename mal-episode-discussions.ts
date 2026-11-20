@@ -5,7 +5,7 @@ function init() {
         const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: 'max-content' });
         tray.render(() => {
             const saved = $storage.get('window.size') || {};
-            tray.div([], { className: 'mal-discussions-host', style: { width: saved.width || '900px', maxWidth: '94vw', minWidth: '380px', height: saved.height || '820px', minHeight: '320px', maxHeight: '88vh', resize: 'both', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } });
+            return tray.div([], { className: 'mal-discussions-host', style: { width: saved.width || '900px', maxWidth: '94vw', minWidth: '380px', height: saved.height || '820px', minHeight: '320px', maxHeight: '88vh', resize: 'both', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } });
         });
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
