@@ -2,6 +2,8 @@ function init() {
     $ui.register((ctx) => {
         let mounting = false;
         let pageMedia: any = null;
+        const requestedFontSize = Number($getUserPreference('fontSize') || 19);
+        const fontSize = Number.isFinite(requestedFontSize) ? Math.min(32, Math.max(12, requestedFontSize)) : 19;
         const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: 'max-content' });
         tray.render(() => {
             const saved = $storage.get('window.size') || {};
@@ -82,7 +84,7 @@ function init() {
                     }
                     const panel = await ctx.dom.createElement('aside');
                     panel.setAttribute('data-mal-discussion-panel', 'true');
-                    panel.setCssText('position:absolute;inset:0 0 16px 0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:19px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
+                    panel.setCssText('position:absolute;inset:0 0 16px 0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:' + fontSize + 'px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
                     host.append(panel);
                     for (const edge of ['top', 'left', 'right', 'bottom']) {
                         const handle = await ctx.dom.createElement('div');

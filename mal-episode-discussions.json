@@ -1,7 +1,7 @@
 {
   "id": "mal-episode-discussions",
   "name": "MAL Episode Discussions",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "manifestURI": "https://raw.githubusercontent.com/KoKaTiM1/seanime-mal-discussions/main/mal-episode-discussions.json",
   "language": "typescript",
   "type": "plugin",
@@ -10,6 +10,6 @@
   "lang": "en",
   "payloadURI": "https://raw.githubusercontent.com/KoKaTiM1/seanime-mal-discussions/main/mal-episode-discussions.ts",
   "website": "https://github.com/KoKaTiM1/seanime-mal-discussions",
-  "userConfig": { "version": 1, "requiresConfig": true, "fields": [{ "type": "text", "name": "clientId", "label": "MyAnimeList API Client ID" }] },
+  "userConfig": { "version": 1, "requiresConfig": true, "fields": [{ "type": "text", "name": "clientId", "label": "MyAnimeList API Client ID" }, { "type": "text", "name": "fontSize", "label": "Discussion font size in pixels (12 to 32)", "default": "19" }] },
   "plugin": { "version": "1", "permissions": { "scopes": ["storage"] } }
 }
