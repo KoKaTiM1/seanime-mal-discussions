@@ -1,0 +1,14 @@
+{
+  "id": "mal-episode-discussions",
+  "name": "MAL Episode Discussions",
+  "version": "0.1.0",
+  "manifestURI": "https://raw.githubusercontent.com/KoKaTiM1/seanime-mal-discussions/main/mal-episode-discussions.json",
+  "language": "typescript",
+  "type": "plugin",
+  "description": "Read MyAnimeList episode discussions inside the built-in player.",
+  "author": "KoKaTiM1",
+  "lang": "en",
+  "payloadURI": "https://raw.githubusercontent.com/KoKaTiM1/seanime-mal-discussions/main/mal-episode-discussions.ts",
+  "website": "https://github.com/KoKaTiM1/seanime-mal-discussions",
+  "plugin": { "version": "1", "permissions": { "scopes": ["storage", "playback"] } }
+}
