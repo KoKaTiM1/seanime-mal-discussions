@@ -2,10 +2,11 @@ function init() {
     $ui.register((ctx) => {
         let mounting = false;
         let pageMedia: any = null;
-        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '650px' });
-        tray.htm(() => '<div data-mal-tray-host style="height:80vh;position:relative"></div>');
+        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '560px' });
+        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { height: '560px', maxHeight: '75vh', position: 'relative' } }));
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
+            pageMedia = null;
             if (e.pathname !== '/entry' || !id) return;
             try {
                 const response = await ctx.fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($id:Int){Media(id:$id,type:ANIME){id idMal episodes title{userPreferred}}}', variables: { id } }) });
@@ -17,7 +18,7 @@ function init() {
         const escape = (s: any) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const controlCss = 'background:#222;color:#eee;border:1px solid #444;border-radius:4px;padding:7px;font:inherit;';
         async function request(path: string) {
-            const clientId = String($storage.get('mal.clientId') || '').trim();
+            const clientId = String($getUserPreference('clientId') || '').trim();
             if (!clientId) throw new Error('Enter your MAL Client ID in settings.');
             const key = clientId + path;
             if (cache[key] && Date.now() - cache[key].at < 60000) return cache[key].data;
@@ -27,7 +28,7 @@ function init() {
             cache[key] = { at: Date.now(), data: data };
             return data;
         }
-        ctx.dom.observe('[data-mal-tray-host]', async (bars) => {
+        ctx.dom.observe('.mal-discussions-host', async (bars) => {
             if (mounting) return;
             mounting = true;
             try {
@@ -77,25 +78,20 @@ function init() {
                         } catch (e) { if (version === revision) body.setText(String(e)); }
                     }
                     await button(header, '\u21bb', 'Refresh discussion', load);
-                    const settings = await ctx.dom.createElement('div'); settings.setCssText('display:none;padding:12px;border-bottom:1px solid #333;');
-                    const input = await ctx.dom.createElement('input'); input.setAttribute('type', 'password'); input.setAttribute('placeholder', 'MAL Client ID'); input.setAttribute('aria-label', 'MAL Client ID'); input.setProperty('value', $storage.get('mal.clientId') || ''); input.setCssText(controlCss + 'width:100%;box-sizing:border-box;'); settings.append(input);
-                    await button(settings, 'Save', 'Save Client ID locally', async () => { $storage.set('mal.clientId', String(await input.getProperty('value') || '').trim()); settings.setStyle('display', 'none'); await load(); });
-                    await button(header, '\u2699', 'Settings', () => settings.setStyle('display', 'block'));
                     await button(header, '\u00d7', 'Close discussions', () => tray.close());
-                    panel.append(settings); panel.append(body);
+                    panel.append(body);
                     const footer = await ctx.dom.createElement('div'); footer.setCssText('display:flex;gap:8px;padding:10px;border-top:1px solid #333;'); panel.append(footer);
                     await button(footer, 'Previous', 'Previous 50 comments', () => { offset = Math.max(0, offset - 50); return load(); });
                     await button(footer, 'Next', 'Next 50 comments', () => { offset += 50; return load(); });
                     const openDiscussion = async () => {
-                        const media: any = pageMedia || ctx.videoCore.getCurrentMedia();
+                        const media: any = pageMedia;
+                        if (!media) { ++revision; episodes.setInnerHTML(''); body.setText('No anime page found. Open an anime page to view its discussions.'); return; }
                         malId = Number(media && media.idMal) || 0;
-                        const info: any = ctx.videoCore.getCurrentPlaybackInfo();
-                        episode = Number(info && info.episode && info.episode.episodeNumber) || 1;
+                        episode = 1;
                         const count = Math.max(episode, Number(media && media.episodes) || 1);
                         episodes.setInnerHTML(Array.from({ length: count }, (_, i) => '<option value="' + (i + 1) + '">Episode ' + (i + 1) + '</option>').join(''));
                         episodes.setProperty('value', String(episode)); topicId = 0; offset = 0;
                         panel.setStyle('display', 'flex');
-                        if (!$storage.get('mal.clientId')) settings.setStyle('display', 'block');
                         await load();
                     };
                     const toggle = await button(header, 'Load', 'Load selected anime discussions', openDiscussion);
