@@ -3,7 +3,7 @@ function init() {
         let mounting = false;
         let pageMedia: any = null;
         const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '950px' });
-        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { height: '720px', maxHeight: '80vh', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } }));
+        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { height: '820px', maxHeight: '88vh', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } }));
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
             pageMedia = null;
@@ -113,7 +113,25 @@ function init() {
                             if (version !== revision) return;
                             const posts = (result.data && result.data.posts) || [];
                             hasNext = !!(result.paging && result.paging.next);
-                            body.setInnerHTML('<h3 style="font-size:16px;margin:0 0 12px">' + escape(result.data && result.data.title) + '</h3>' + posts.map((p: any) => {
+                            const roots: any[] = [];
+                            const authors: Record<string, any> = {};
+                            const ids: Record<string, any> = {};
+                            for (const post of posts) {
+                                const node = { post, replies: [] as any[] };
+                                const raw = String(post.body || '');
+                                const quotedId = raw.match(/\[quote=[^\]]*message\s*=\s*(\d+)/i);
+                                const quotedName = raw.match(/\[quote\s*=\s*["']?([^\s\]"']+)/i);
+                                const mention = raw.match(/(?:^|\s)@([a-z0-9_-]+)/i);
+                                const target = quotedId && ids[quotedId[1]] || ((quotedName || mention) && authors[String((quotedName || mention)![1]).toLowerCase()]);
+                                if (target) target.replies.push(node); else roots.push(node);
+                                ids[String(post.id)] = node;
+                                authors[String(post.created_by && post.created_by.name || '').toLowerCase()] = node;
+                            }
+                            const renderThread = (node: any, depth: number): string => {
+                                const p = node.post;
+                                return '<section style="margin-left:' + (depth ? '18px' : '0') + ';' + (depth ? 'border-left:2px solid #555;padding-left:12px;' : '') + '">' + renderPost(p) + node.replies.map((reply: any) => renderThread(reply, depth + 1)).join('') + '</section>';
+                            };
+                            const renderPost = (p: any): string => {
                                 return '<article style="background:#121212;border-radius:6px;padding:16px;margin:12px 0;overflow-wrap:anywhere"><strong style="font-size:14px;color:#eee">' + escape(p.created_by && p.created_by.name) + '</strong><small style="margin-left:12px;color:#999">' + escape(new Date(p.created_at).toLocaleDateString()) + '</small><div style="white-space:pre-wrap;margin-top:10px">' + renderComment(p.body) + '</div></article>';
                                 /* Legacy renderer retained below pending cleanup.
                                 let text = String(p.body || '');
@@ -123,7 +141,8 @@ function init() {
                                 text = text.replace(/<[^>]*>/g, '').replace(/\[\/?[^\]]+\]/g, '').replace(/&#(x[0-9a-f]+|\d+);/gi, (_, n) => { const code = n[0].toLowerCase() === 'x' ? parseInt(n.slice(1), 16) : Number(n); return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ''; }).replace(/&quot;/g, '"').replace(/&#039;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
                                 return '<article style="background:#121212;border-radius:6px;padding:16px;margin:12px 0;overflow-wrap:anywhere"><strong style="font-size:14px;color:#eee">' + escape(p.created_by && p.created_by.name) + '</strong><small style="margin-left:12px;color:#999">' + escape(new Date(p.created_at).toLocaleDateString()) + '</small><div style="white-space:pre-wrap;margin-top:10px">' + escape(text).replace(/\n{3,}/g, '\n\n') + '</div>' + images.map(url => '<img loading="lazy" referrerpolicy="no-referrer" src="' + escape(url) + '" style="max-width:100%;height:auto;margin-top:8px">').join('') + '</article>';
                                 */
-                            }).join('') + (!posts.length ? '<p>No comments on this page.</p>' : ''));
+                            };
+                            body.setInnerHTML('<h3 style="font-size:16px;margin:0 0 12px">' + escape(result.data && result.data.title) + '</h3>' + roots.map(node => renderThread(node, 0)).join('') + (!posts.length ? '<p>No comments on this page.</p>' : ''));
                             body.setProperty('scrollTop', 0);
                         } catch (e) { if (version === revision) body.setText(String(e)); }
                         finally { if (version === revision) { busy = false; updatePaging(); } }
