@@ -1,6 +1,18 @@
 function init() {
     $ui.register((ctx) => {
         let mounting = false;
+        let pageMedia: any = null;
+        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '650px' });
+        tray.htm(() => '<div data-mal-tray-host style="height:80vh;position:relative"></div>');
+        ctx.screen.onNavigate(async (e) => {
+            const id = Number(e.searchParams && e.searchParams.id);
+            if (e.pathname !== '/entry' || !id) return;
+            try {
+                const response = await ctx.fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($id:Int){Media(id:$id,type:ANIME){id idMal episodes title{userPreferred}}}', variables: { id } }) });
+                pageMedia = response.json().data.Media;
+            } catch (e) { console.error('MAL media lookup:', e); }
+        });
+        ctx.screen.loadCurrent();
         const cache: Record<string, any> = {};
         const escape = (s: any) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const controlCss = 'background:#222;color:#eee;border:1px solid #444;border-radius:4px;padding:7px;font:inherit;';
@@ -15,17 +27,17 @@ function init() {
             cache[key] = { at: Date.now(), data: data };
             return data;
         }
-        ctx.dom.observe('[data-vc-element="control-bar-main-section"]', async (bars) => {
+        ctx.dom.observe('[data-mal-tray-host]', async (bars) => {
             if (mounting) return;
             mounting = true;
             try {
                 for (const bar of bars) {
                     if (await bar.queryOne('[data-mal-discussion-button]')) continue;
-                    const host = await ctx.dom.queryOne('[data-vc-element="container"]');
+                    const host = bar;
                     if (!host) continue;
                     const panel = await ctx.dom.createElement('aside');
                     panel.setAttribute('data-mal-discussion-panel', 'true');
-                    panel.setCssText('position:absolute;right:12px;top:52px;bottom:84px;width:420px;max-width:calc(100% - 24px);z-index:100;background:#111;color:#eee;border:1px solid #444;border-radius:6px;display:none;flex-direction:column;font-size:14px;pointer-events:auto;');
+                    panel.setCssText('position:absolute;inset:0;background:#111;color:#eee;display:flex;flex-direction:column;font-size:14px;pointer-events:auto;');
                     host.append(panel);
                     const header = await ctx.dom.createElement('div');
                     header.setCssText('display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #333;flex-wrap:wrap;');
@@ -55,8 +67,12 @@ function init() {
                             if (version !== revision) return;
                             const posts = (result.data && result.data.posts) || [];
                             body.setInnerHTML('<h3 style="font-size:16px;margin:0 0 12px">' + escape(result.data && result.data.title) + '</h3>' + posts.map((p: any) => {
-                                const text = String(p.body || '').replace(/\[spoiler(?:=[^\]]*)?\][\s\S]*?\[\/spoiler\]/gi, '[Spoiler hidden]').replace(/\[\/?[^\]]+\]/g, '');
-                                return '<article style="border-bottom:1px solid #333;padding:12px 0;overflow-wrap:anywhere"><strong>' + escape(p.created_by && p.created_by.name) + '</strong><small style="display:block;color:#999">' + escape(p.created_at) + '</small><div style="white-space:pre-wrap">' + escape(text) + '</div></article>';
+                                let text = String(p.body || '').replace(/<br\s*\/?\s*>/gi, '\n').replace(/\[spoiler(?:=[^\]]*)?\][\s\S]*?\[\/spoiler\]/gi, '[Spoiler hidden]');
+                                const images: string[] = [];
+                                text = text.replace(/\[img(?:=[^\]]*)?\](https?:\/\/[^\s<>]+?)\[\/img\]/gi, (_, url) => { images.push(url); return ''; });
+                                text = text.replace(/<img\b[^>]*src=["'](https?:\/\/[^"']+)["'][^>]*>/gi, (_, url) => { images.push(url); return ''; });
+                                text = text.replace(/<[^>]*>/g, '').replace(/\[\/?[^\]]+\]/g, '');
+                                return '<article style="border-bottom:1px solid #333;padding:12px 0;overflow-wrap:anywhere"><strong>' + escape(p.created_by && p.created_by.name) + '</strong><small style="display:block;color:#999">' + escape(p.created_at) + '</small><div style="white-space:pre-wrap">' + escape(text) + '</div>' + images.map(url => '<img loading="lazy" referrerpolicy="no-referrer" src="' + escape(url) + '" style="max-width:100%;height:auto;margin-top:8px">').join('') + '</article>';
                             }).join('') + (!posts.length ? '<p>No comments on this page.</p>' : ''));
                         } catch (e) { if (version === revision) body.setText(String(e)); }
                     }
@@ -65,13 +81,13 @@ function init() {
                     const input = await ctx.dom.createElement('input'); input.setAttribute('type', 'password'); input.setAttribute('placeholder', 'MAL Client ID'); input.setAttribute('aria-label', 'MAL Client ID'); input.setProperty('value', $storage.get('mal.clientId') || ''); input.setCssText(controlCss + 'width:100%;box-sizing:border-box;'); settings.append(input);
                     await button(settings, 'Save', 'Save Client ID locally', async () => { $storage.set('mal.clientId', String(await input.getProperty('value') || '').trim()); settings.setStyle('display', 'none'); await load(); });
                     await button(header, '\u2699', 'Settings', () => settings.setStyle('display', 'block'));
-                    await button(header, '\u00d7', 'Close discussions', () => panel.setStyle('display', 'none'));
+                    await button(header, '\u00d7', 'Close discussions', () => tray.close());
                     panel.append(settings); panel.append(body);
                     const footer = await ctx.dom.createElement('div'); footer.setCssText('display:flex;gap:8px;padding:10px;border-top:1px solid #333;'); panel.append(footer);
                     await button(footer, 'Previous', 'Previous 50 comments', () => { offset = Math.max(0, offset - 50); return load(); });
                     await button(footer, 'Next', 'Next 50 comments', () => { offset += 50; return load(); });
-                    const toggle = await button(bar, 'MAL', 'MyAnimeList episode discussions', async () => {
-                        const media: any = ctx.videoCore.getCurrentMedia();
+                    const openDiscussion = async () => {
+                        const media: any = pageMedia || ctx.videoCore.getCurrentMedia();
                         malId = Number(media && media.idMal) || 0;
                         const info: any = ctx.videoCore.getCurrentPlaybackInfo();
                         episode = Number(info && info.episode && info.episode.episodeNumber) || 1;
@@ -81,10 +97,12 @@ function init() {
                         panel.setStyle('display', 'flex');
                         if (!$storage.get('mal.clientId')) settings.setStyle('display', 'block');
                         await load();
-                    });
+                    };
+                    const toggle = await button(header, 'Load', 'Load selected anime discussions', openDiscussion);
                     toggle.setAttribute('data-mal-discussion-button', 'true');
                     toggle.setCssText('background:transparent;border:0;color:white;padding:0 10px;height:100%;cursor:pointer;font-size:14px;');
                     episodes.addEventListener('change', async () => { episode = Number(await episodes.getProperty('value')); offset = 0; topicId = 0; await load(); });
+                    await openDiscussion();
                 }
             } finally { mounting = false; }
         });
