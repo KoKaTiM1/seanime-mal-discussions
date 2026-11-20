@@ -17,7 +17,7 @@ function init() {
         const cache: Record<string, any> = {};
         const escape = (s: any) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         function renderComment(raw: string) {
-            let text = String(raw || '').replace(/<br\s*\/?\s*>/gi, '\n').replace(/\[spoiler(?:=[^\]]*)?\][\s\S]*?\[\/spoiler\]/gi, '[Spoiler hidden]');
+            let text = String(raw || '').replace(/<blockquote\b[^>]*>/gi, '[quote]').replace(/<\/blockquote>/gi, '[/quote]').replace(/<br\s*\/?\s*>/gi, '\n').replace(/\[spoiler(?:=[^\]]*)?\][\s\S]*?\[\/spoiler\]/gi, '[Spoiler hidden]');
             text = text.replace(/<img\b[^>]*src=["'](https?:\/\/[^"']+)["'][^>]*>/gi, '[img]$1[/img]').replace(/<[^>]*>/g, '');
             text = text.replace(/&#(x[0-9a-f]+|\d+);/gi, (_, n) => { const c = n[0].toLowerCase() === 'x' ? parseInt(n.slice(1), 16) : Number(n); return c > 0 && c <= 0x10ffff ? String.fromCodePoint(c) : ''; }).replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
             let html = escape(text);
@@ -50,6 +50,18 @@ function init() {
                     if (await bar.queryOne('[data-mal-discussion-button]')) continue;
                     const host = bar;
                     if (!host) continue;
+                    // Seanime wraps tray content in its own 35rem scroll area.
+                    let ancestor = await host.getParent();
+                    for (let depth = 0; ancestor && depth < 6; depth++) {
+                        const classes = await ancestor.getAttribute('class') || '';
+                        if (classes.includes('overflow-y-auto') && classes.includes('35rem')) {
+                            ancestor.setStyle('overflow', 'hidden');
+                            ancestor.setStyle('max-height', 'none');
+                            ancestor.setStyle('padding', '0');
+                            break;
+                        }
+                        ancestor = await ancestor.getParent();
+                    }
                     const panel = await ctx.dom.createElement('aside');
                     panel.setAttribute('data-mal-discussion-panel', 'true');
                     panel.setCssText('position:absolute;inset:0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:17px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
