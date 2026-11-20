@@ -221,8 +221,13 @@ function init() {
                         malId = Number(media && media.idMal) || 0;
                         title.setText(media.title.userPreferred + ' - MAL Discussions');
                         episode = 1;
+                        try {
+                            const entry = await ctx.anime.getAnimeEntry(media.id);
+                            episode = Math.max(1, Math.floor(Number(entry.listData && entry.listData.progress) || 1));
+                        } catch (error) { console.error('MAL discussion watched progress:', error); }
                         const count = media.nextAiringEpisode ? Math.max(0, media.nextAiringEpisode.episode - 1) : media.status === 'NOT_YET_RELEASED' ? 0 : Number(media.episodes) || 0;
                         if (!count) { episodes.setInnerHTML(''); body.setText('No aired episodes found.'); return; }
+                        episode = Math.min(episode, count);
                         episodes.setInnerHTML(Array.from({ length: count }, (_, i) => '<option value="' + (i + 1) + '">Episode ' + (i + 1) + '</option>').join(''));
                         episodes.setProperty('value', String(episode)); topicId = 0; offset = 0;
                         panel.setStyle('display', 'flex');
