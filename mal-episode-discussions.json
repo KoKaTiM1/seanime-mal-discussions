@@ -1,7 +1,7 @@
 {
   "id": "mal-episode-discussions",
   "name": "MAL Episode Discussions",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "manifestURI": "https://raw.githubusercontent.com/KoKaTiM1/seanime-mal-discussions/main/mal-episode-discussions.json",
   "language": "typescript",
   "type": "plugin",

@@ -3,7 +3,7 @@ function init() {
         let mounting = false;
         let pageMedia: any = null;
         const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '950px' });
-        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { height: '820px', maxHeight: '88vh', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } }));
+        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { width: '900px', maxWidth: '90vw', minWidth: '380px', height: '820px', minHeight: '320px', maxHeight: '88vh', resize: 'both', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } }));
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
             pageMedia = null;
@@ -28,7 +28,7 @@ function init() {
             html = html.replace(/https?:\/\/[^\s<>\[\]]+?\.(?:jpg|jpeg|png|gif|webp)(?:\?[^\s<>\[\]]*)?/gi, url => storeImage(url));
             html = html.replace(/\[quote(?:=([^\]]*))?\]/gi, (_, author) => '<blockquote style="margin:8px 0;padding:10px 14px;border-left:3px solid #777;background:#202020;border-radius:4px">' + (author ? '<strong style="font-size:14px;display:block">' + author + '</strong>' : '')).replace(/\[\/quote\]/gi, '</blockquote>');
             html = html.replace(/\[b\]/gi, '<strong>').replace(/\[\/b\]/gi, '</strong>').replace(/\[i\]/gi, '<em>').replace(/\[\/i\]/gi, '</em>').replace(/\[\/?[^\]]+\]/g, '');
-            return html.replace(/\n{3,}/g, '\n\n').replace(/\u0001(\d+)\u0002/g, (_, index) => embeds[Number(index)]);
+            return html.replace(/(?:[ \t\r]*\n){3,}/g, '\n\n').replace(/\u0001(\d+)\u0002/g, (_, index) => embeds[Number(index)]);
         }
         const controlCss = 'background:#222;color:#eee;border:1px solid #444;border-radius:4px;padding:7px;font:inherit;';
         async function request(path: string) {
@@ -58,13 +58,15 @@ function init() {
                             ancestor.setStyle('overflow', 'hidden');
                             ancestor.setStyle('max-height', 'none');
                             ancestor.setStyle('padding', '0');
+                            const outer = await ancestor.getParent();
+                            if (outer) outer.setStyle('width', 'max-content');
                             break;
                         }
                         ancestor = await ancestor.getParent();
                     }
                     const panel = await ctx.dom.createElement('aside');
                     panel.setAttribute('data-mal-discussion-panel', 'true');
-                    panel.setCssText('position:absolute;inset:0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:17px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
+                    panel.setCssText('position:absolute;inset:0 0 16px 0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:17px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
                     host.append(panel);
                     const header = await ctx.dom.createElement('div');
                     header.setCssText('display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #333;flex-wrap:wrap;flex-shrink:0;');
@@ -144,6 +146,25 @@ function init() {
                             };
                             body.setInnerHTML('<h3 style="font-size:16px;margin:0 0 12px">' + escape(result.data && result.data.title) + '</h3>' + roots.map(node => renderThread(node, 0)).join('') + (!posts.length ? '<p>No comments on this page.</p>' : ''));
                             body.setProperty('scrollTop', 0);
+                            const pictures = await body.query('img');
+                            for (const picture of pictures) {
+                                picture.setStyle('cursor', 'zoom-in');
+                                picture.addEventListener('click', async () => {
+                                    const src = await picture.getAttribute('src');
+                                    if (!src) return;
+                                    const viewer = await ctx.dom.createElement('div');
+                                    viewer.setCssText('position:absolute;inset:0;z-index:200;background:rgba(0,0,0,.96);display:flex;align-items:center;justify-content:center;padding:42px 12px 12px;box-sizing:border-box;');
+                                    viewer.setAttribute('role', 'dialog');
+                                    viewer.setAttribute('aria-label', 'Expanded comment image');
+                                    const expanded = await ctx.dom.createElement('img');
+                                    expanded.setAttribute('src', src); expanded.setAttribute('alt', 'Expanded comment image'); expanded.setAttribute('referrerpolicy', 'no-referrer');
+                                    expanded.setCssText('width:100%;height:100%;object-fit:contain;min-height:0;');
+                                    viewer.append(expanded);
+                                    const close = await button(viewer, '\u00d7', 'Close image', () => viewer.remove());
+                                    close.setCssText(controlCss + 'position:absolute;right:10px;top:8px;cursor:pointer;font-size:22px;');
+                                    host.append(viewer);
+                                });
+                            }
                         } catch (e) { if (version === revision) body.setText(String(e)); }
                         finally { if (version === revision) { busy = false; updatePaging(); } }
                     }
