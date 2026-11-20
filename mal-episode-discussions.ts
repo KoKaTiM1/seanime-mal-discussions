@@ -2,7 +2,7 @@ function init() {
     $ui.register((ctx) => {
         let mounting = false;
         let pageMedia: any = null;
-        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '950px' });
+        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: 'max-content' });
         tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { width: '900px', maxWidth: '90vw', minWidth: '380px', height: '820px', minHeight: '320px', maxHeight: '88vh', resize: 'both', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } }));
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
@@ -50,6 +50,13 @@ function init() {
                     if (await bar.queryOne('[data-mal-discussion-button]')) continue;
                     const host = bar;
                     if (!host) continue;
+                    const popup = await ctx.dom.queryOne('[data-plugin-tray-popover-content="mal-episode-discussions"]');
+                    if (popup) {
+                        popup.setStyle('width', 'max-content');
+                        popup.setStyle('min-width', '0');
+                        popup.setStyle('max-width', '94vw');
+                        popup.setStyle('height', 'auto');
+                    }
                     // Seanime wraps tray content in its own 35rem scroll area.
                     let ancestor = await host.getParent();
                     for (let depth = 0; ancestor && depth < 6; depth++) {
@@ -68,6 +75,14 @@ function init() {
                     panel.setAttribute('data-mal-discussion-panel', 'true');
                     panel.setCssText('position:absolute;inset:0 0 16px 0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:17px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
                     host.append(panel);
+                    for (const edge of ['top', 'left', 'right', 'bottom']) {
+                        const handle = await ctx.dom.createElement('div');
+                        const vertical = edge === 'top' || edge === 'bottom';
+                        handle.setAttribute('title', 'Resize discussions');
+                        handle.setCssText('position:absolute;z-index:300;' + edge + ':0;' + (vertical ? 'left:0;right:0;height:7px;cursor:ns-resize;' : 'top:0;bottom:0;width:7px;cursor:ew-resize;') + 'touch-action:none;');
+                        handle.setAttribute('onpointerdown', "event.preventDefault();event.stopPropagation();const box=this.parentElement;const x=event.clientX,y=event.clientY,w=box.offsetWidth,h=box.offsetHeight;const move=e=>{box.style.width=Math.max(380,Math.min(innerWidth*.9,w+(e.clientX-x)*" + (edge === 'left' ? '-1' : '1') + "))+'px';box.style.height=Math.max(320,Math.min(innerHeight*.88,h+(e.clientY-y)*" + (edge === 'top' ? '-1' : '1') + "))+'px';};const resize=e=>{" + (vertical ? 'const old=box.style.width;move(e);box.style.width=old;' : 'const old=box.style.height;move(e);box.style.height=old;') + "};const end=()=>{document.removeEventListener('pointermove',resize);document.removeEventListener('pointerup',end);};document.addEventListener('pointermove',resize);document.addEventListener('pointerup',end);");
+                        host.append(handle);
+                    }
                     const header = await ctx.dom.createElement('div');
                     header.setCssText('display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #333;flex-wrap:wrap;flex-shrink:0;');
                     panel.append(header);
@@ -156,6 +171,8 @@ function init() {
                                     viewer.setCssText('position:absolute;inset:0;z-index:200;background:rgba(0,0,0,.96);display:flex;align-items:center;justify-content:center;padding:42px 12px 12px;box-sizing:border-box;');
                                     viewer.setAttribute('role', 'dialog');
                                     viewer.setAttribute('aria-label', 'Expanded comment image');
+                                    viewer.setStyle('cursor', 'zoom-out');
+                                    viewer.addEventListener('click', () => viewer.remove());
                                     const expanded = await ctx.dom.createElement('img');
                                     expanded.setAttribute('src', src); expanded.setAttribute('alt', 'Expanded comment image'); expanded.setAttribute('referrerpolicy', 'no-referrer');
                                     expanded.setCssText('width:100%;height:100%;object-fit:contain;min-height:0;');
