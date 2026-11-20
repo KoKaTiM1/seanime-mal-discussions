@@ -3,7 +3,10 @@ function init() {
         let mounting = false;
         let pageMedia: any = null;
         const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: 'max-content' });
-        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { width: '900px', maxWidth: '90vw', minWidth: '380px', height: '820px', minHeight: '320px', maxHeight: '88vh', resize: 'both', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } }));
+        tray.render(() => {
+            const saved = $storage.get('window.size') || {};
+            tray.div([], { className: 'mal-discussions-host', style: { width: saved.width || '900px', maxWidth: '94vw', minWidth: '380px', height: saved.height || '820px', minHeight: '320px', maxHeight: '88vh', resize: 'both', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' } });
+        });
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
             pageMedia = null;
@@ -50,6 +53,12 @@ function init() {
                     if (await bar.queryOne('[data-mal-discussion-button]')) continue;
                     const host = bar;
                     if (!host) continue;
+                    const saveSize = async () => {
+                        if (await host.getAttribute('data-maximized') === 'true') return;
+                        $storage.set('window.size', { width: await host.getStyle('width'), height: await host.getStyle('height') });
+                    };
+                    host.addEventListener('pointerup', saveSize);
+                    host.addEventListener('mouseup', saveSize);
                     const popup = await ctx.dom.queryOne('[data-plugin-tray-popover-content="mal-episode-discussions"]');
                     if (popup) {
                         popup.setStyle('width', 'max-content');
@@ -73,7 +82,7 @@ function init() {
                     }
                     const panel = await ctx.dom.createElement('aside');
                     panel.setAttribute('data-mal-discussion-panel', 'true');
-                    panel.setCssText('position:absolute;inset:0 0 16px 0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:17px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
+                    panel.setCssText('position:absolute;inset:0 0 16px 0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:19px;pointer-events:auto;overflow:hidden;box-sizing:border-box;');
                     host.append(panel);
                     for (const edge of ['top', 'left', 'right', 'bottom']) {
                         const handle = await ctx.dom.createElement('div');
@@ -186,6 +195,19 @@ function init() {
                         finally { if (version === revision) { busy = false; updatePaging(); } }
                     }
                     await button(header, '\u21bb', 'Refresh discussion', load);
+                    let restoreSize: any = null;
+                    const maximize = await button(header, '\u26f6', 'Maximize or restore window', async () => {
+                        if (restoreSize) {
+                            host.setStyle('width', restoreSize.width); host.setStyle('height', restoreSize.height);
+                            restoreSize = null; host.setAttribute('data-maximized', 'false');
+                            host.setStyle('resize', 'both');
+                        } else {
+                            restoreSize = { width: await host.getStyle('width'), height: await host.getStyle('height') };
+                            $storage.set('window.size', restoreSize);
+                            host.setAttribute('data-maximized', 'true');
+                            host.setStyle('width', '94vw'); host.setStyle('height', '88vh'); host.setStyle('resize', 'none');
+                        }
+                    });
                     await button(header, '\u00d7', 'Close discussions', () => tray.close());
                     panel.append(body);
                     const footer = await ctx.dom.createElement('div'); footer.setCssText('display:flex;align-items:center;justify-content:center;gap:16px;padding:10px;border-top:1px solid #333;flex-shrink:0;background:#090909;'); panel.append(footer);
