@@ -2,14 +2,14 @@ function init() {
     $ui.register((ctx) => {
         let mounting = false;
         let pageMedia: any = null;
-        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '560px' });
-        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { height: '560px', maxHeight: '75vh', position: 'relative' } }));
+        const tray = ctx.newTray({ iconUrl: 'https://cdn.myanimelist.net/images/favicon.ico', withContent: true, width: '850px' });
+        tray.render(() => tray.div([], { className: 'mal-discussions-host', style: { height: '650px', maxHeight: '75vh', position: 'relative' } }));
         ctx.screen.onNavigate(async (e) => {
             const id = Number(e.searchParams && e.searchParams.id);
             pageMedia = null;
             if (e.pathname !== '/entry' || !id) return;
             try {
-                const response = await ctx.fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($id:Int){Media(id:$id,type:ANIME){id idMal episodes title{userPreferred}}}', variables: { id } }) });
+                const response = await ctx.fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($id:Int){Media(id:$id,type:ANIME){id idMal episodes status nextAiringEpisode{episode} title{userPreferred}}}', variables: { id } }) });
                 pageMedia = response.json().data.Media;
             } catch (e) { console.error('MAL media lookup:', e); }
         });
@@ -38,7 +38,7 @@ function init() {
                     if (!host) continue;
                     const panel = await ctx.dom.createElement('aside');
                     panel.setAttribute('data-mal-discussion-panel', 'true');
-                    panel.setCssText('position:absolute;inset:0;background:#111;color:#eee;display:flex;flex-direction:column;font-size:14px;pointer-events:auto;');
+                    panel.setCssText('position:absolute;inset:0;background:#090909;color:#ccc;display:flex;flex-direction:column;font-size:17px;pointer-events:auto;');
                     host.append(panel);
                     const header = await ctx.dom.createElement('div');
                     header.setCssText('display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #333;flex-wrap:wrap;');
@@ -58,9 +58,18 @@ function init() {
                         try {
                             if (!malId) throw new Error('This anime has no MyAnimeList ID.');
                             if (!topicId) {
-                                const result = await request('/forum/topics?anime_id=' + malId + '&q=' + encodeURIComponent('Episode ' + episode) + '&limit=100');
+                                const anime = await request('/anime/' + malId + '?fields=alternative_titles');
+                                if (version !== revision) return;
+                                const result = await request('/forum/topics?q=' + encodeURIComponent(anime.title + ' Episode ' + episode) + '&limit=100');
+                                if (version !== revision) return;
                                 const pattern = new RegExp('\\bEpisode\\s+0*' + episode + '\\b', 'i');
-                                const topics = (result.data || []).filter((t: any) => pattern.test(t.title || '') && /discussion/i.test(t.title || ''));
+                                const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                const names = [anime.title, anime.alternative_titles && anime.alternative_titles.en].filter(Boolean).map(normalize);
+                                const topics = (result.data || []).filter((t: any) => {
+                                    const title = String(t.title || '');
+                                    const series = normalize(title.split(/\bEpisode\s+\d+/i)[0].replace(/\[spoilers?\]/gi, ''));
+                                    return pattern.test(title) && /discussion/i.test(title) && names.indexOf(series) !== -1;
+                                });
                                 if (!topics.length) throw new Error('No discussion thread found for episode ' + episode + '.');
                                 topicId = topics[0].id;
                             }
@@ -72,8 +81,8 @@ function init() {
                                 const images: string[] = [];
                                 text = text.replace(/\[img(?:=[^\]]*)?\](https?:\/\/[^\s<>]+?)\[\/img\]/gi, (_, url) => { images.push(url); return ''; });
                                 text = text.replace(/<img\b[^>]*src=["'](https?:\/\/[^"']+)["'][^>]*>/gi, (_, url) => { images.push(url); return ''; });
-                                text = text.replace(/<[^>]*>/g, '').replace(/\[\/?[^\]]+\]/g, '');
-                                return '<article style="border-bottom:1px solid #333;padding:12px 0;overflow-wrap:anywhere"><strong>' + escape(p.created_by && p.created_by.name) + '</strong><small style="display:block;color:#999">' + escape(p.created_at) + '</small><div style="white-space:pre-wrap">' + escape(text) + '</div>' + images.map(url => '<img loading="lazy" referrerpolicy="no-referrer" src="' + escape(url) + '" style="max-width:100%;height:auto;margin-top:8px">').join('') + '</article>';
+                                text = text.replace(/<[^>]*>/g, '').replace(/\[\/?[^\]]+\]/g, '').replace(/&#(x[0-9a-f]+|\d+);/gi, (_, n) => { const code = n[0].toLowerCase() === 'x' ? parseInt(n.slice(1), 16) : Number(n); return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ''; }).replace(/&quot;/g, '"').replace(/&#039;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+                                return '<article style="background:#121212;border-radius:6px;padding:16px;margin:12px 0;overflow-wrap:anywhere"><strong style="font-size:14px;color:#eee">' + escape(p.created_by && p.created_by.name) + '</strong><small style="margin-left:12px;color:#999">' + escape(new Date(p.created_at).toLocaleDateString()) + '</small><div style="white-space:pre-wrap;margin-top:10px">' + escape(text).replace(/\n{3,}/g, '\n\n') + '</div>' + images.map(url => '<img loading="lazy" referrerpolicy="no-referrer" src="' + escape(url) + '" style="max-width:100%;height:auto;margin-top:8px">').join('') + '</article>';
                             }).join('') + (!posts.length ? '<p>No comments on this page.</p>' : ''));
                         } catch (e) { if (version === revision) body.setText(String(e)); }
                     }
@@ -87,8 +96,10 @@ function init() {
                         const media: any = pageMedia;
                         if (!media) { ++revision; episodes.setInnerHTML(''); body.setText('No anime page found. Open an anime page to view its discussions.'); return; }
                         malId = Number(media && media.idMal) || 0;
+                        title.setText(media.title.userPreferred + ' - MAL Discussions');
                         episode = 1;
-                        const count = Math.max(episode, Number(media && media.episodes) || 1);
+                        const count = media.nextAiringEpisode ? Math.max(0, media.nextAiringEpisode.episode - 1) : media.status === 'NOT_YET_RELEASED' ? 0 : Number(media.episodes) || 0;
+                        if (!count) { episodes.setInnerHTML(''); body.setText('No aired episodes found.'); return; }
                         episodes.setInnerHTML(Array.from({ length: count }, (_, i) => '<option value="' + (i + 1) + '">Episode ' + (i + 1) + '</option>').join(''));
                         episodes.setProperty('value', String(episode)); topicId = 0; offset = 0;
                         panel.setStyle('display', 'flex');
